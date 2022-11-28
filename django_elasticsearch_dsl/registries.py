@@ -9,6 +9,7 @@ from elasticsearch_dsl import AttrDict
 from six import itervalues, iterkeys, iteritems
 
 from django_elasticsearch_dsl.exceptions import RedeclaredFieldError
+from . import fields
 from .apps import DEDConfig
 
 
