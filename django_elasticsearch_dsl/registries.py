@@ -49,6 +49,25 @@ class DocumentRegistry(object):
         if not django_attr.model:
             raise ImproperlyConfigured("You must specify the django model")
 
+        nested_fields = getattr(document.Django, 'nested_fields', [])
+
+        # Convert nested fields to nested objects as the documents class attributes
+        for field_name in nested_fields:
+            field = django_attr.model._meta.get_field(field_name)  # noqa
+
+            # Check if the field is related to another model
+            if field.related_model:
+                setattr(
+                    document,
+                    field_name,
+                    self.__build_nested_field(
+                        base_model=field.related_model,
+                        document=document,
+                        model=field.related_model,
+                        properties={}
+                    )
+                )
+
         # Add The model fields into elasticsearch mapping field
         model_field_names = getattr(document.Django, "fields", [])
         mapping_fields = document._doc_type.mapping.properties.properties.to_dict().keys()
@@ -174,5 +193,21 @@ class DocumentRegistry(object):
 
         return set(iterkeys(self._indices))
 
+    def __build_nested_field(self, base_model, document, model, properties):
+
+        for field in model._meta.fields:  # noqa
+            if field.is_relation:
+                if field.related_model != base_model:
+                    continue
+                properties[field.name] = self._build_nested_field(
+                    base_model=field.related_model,
+                    document=document,
+                    model=field.related_model,
+                    properties={}
+                )
+            else:
+                properties[field.name] = document.to_field(field.name, field)
+
+        return fields.NestedField(properties=properties)
 
 registry = DocumentRegistry()
